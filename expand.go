@@ -1,26 +1,23 @@
 package yaml
 
 import (
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
 )
 
 var (
-	envValReg, allPatternReg,keyPatternReg *regexp.Regexp
+	envValReg, allPatternReg *regexp.Regexp
 )
 
 const (
 	envValRegPattern = `\${(.*?)}`
 	// all Pattern
-	allPattern = `\$\[.*[|]{2}.*\]`
-	keyPattern = `\${(.*)}`
+	allPattern = `\$\[([^\|]+)\|\|([^\]]+)`
 )
 func init()  {
 	envValReg = regexp.MustCompile(envValRegPattern)
 	allPatternReg = regexp.MustCompile(allPattern)
-	keyPatternReg = regexp.MustCompile(keyPattern)
 }
 // if string like $[${NAME}||archaius]
 // will query environment variable for ${NAME}
@@ -30,20 +27,22 @@ func expandValueEnv(value string) (realValue string) {
 	if !allPatternReg.MatchString(value) {
 		return realValue
 	}
-	key := keyPatternReg.FindString(value)
-	fmt.Println(key)
-	defaultVal := strings.TrimPrefix(value[2:], key)
-	defaultVal = defaultVal[2:len(defaultVal)-1]
-	envMatch := envValReg.FindAllString(key, -1)
 
+	match := allPatternReg.FindAllStringSubmatch(value, -1)
+	envVal, realValue := match[0][1],match[0][2]
+
+	// convert env val
+	envMatch := envValReg.FindAllString(envVal, -1)
+	if len(envMatch) == 0 {
+		return
+	}
 	for i, s := range envMatch {
-		fmt.Println(s[2:len(s)-1])
-		newVal := os.Getenv(s[2:len(s)-1])
-		if newVal == "" {
-			return defaultVal
+		newValFiled := os.Getenv(s[2:len(s)-1])
+		if newValFiled == "" {
+			return
 		}
-		key = strings.ReplaceAll(key, envMatch[i], newVal)
+		envVal = strings.ReplaceAll(envVal, envMatch[i], newValFiled)
  	}
 
-	return key
+	return envVal
 }
