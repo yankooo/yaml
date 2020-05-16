@@ -22,8 +22,8 @@ type StructB struct {
 }
 
 var data = `
-a: a string from struct A
-b: a string from struct B
+a: $[${ADDR}:${PORT}||a string from struct A]
+b: $[]
 `
 
 func ExampleUnmarshal_embedded() {

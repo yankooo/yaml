@@ -1,43 +1,49 @@
 package yaml
 
 import (
+	"fmt"
 	"os"
+	"regexp"
+	"strings"
 )
 
-// if string like ${NAME||archaius}
+var (
+	envValReg, allPatternReg,keyPatternReg *regexp.Regexp
+)
+
+const (
+	envValRegPattern = `\${(.*?)}`
+	// all Pattern
+	allPattern = `\$\[.*[|]{2}.*\]`
+	keyPattern = `\${(.*)}`
+)
+func init()  {
+	envValReg = regexp.MustCompile(envValRegPattern)
+	allPatternReg = regexp.MustCompile(allPattern)
+	keyPatternReg = regexp.MustCompile(keyPattern)
+}
+// if string like $[${NAME}||archaius]
 // will query environment variable for ${NAME}
 // if environment variable is "" return default string `archaius`
 func expandValueEnv(value string) (realValue string) {
 	realValue = value
-
-	vLen := len(value)
-	// 3 = ${}
-	if vLen < 3 {
-		return
+	if !allPatternReg.MatchString(value) {
+		return realValue
 	}
-	// Need start with "${" and end with "}", then return.
-	if value[0] != '$' || value[1] != '{' || value[vLen-1] != '}' {
-		return
-	}
+	key := keyPatternReg.FindString(value)
+	fmt.Println(key)
+	defaultVal := strings.TrimPrefix(value[2:], key)
+	defaultVal = defaultVal[2:len(defaultVal)-1]
+	envMatch := envValReg.FindAllString(key, -1)
 
-	key := ""
-	defaultV := ""
-	// value start with "${"
-	for i := 2; i < vLen; i++ {
-		if value[i] == '|' && (i+1 < vLen && value[i+1] == '|') {
-			key = value[2:i]
-			defaultV = value[i+2 : vLen-1] // other string is default value.
-			break
-		} else if value[i] == '}' {
-			key = value[2:i]
-			break
+	for i, s := range envMatch {
+		fmt.Println(s[2:len(s)-1])
+		newVal := os.Getenv(s[2:len(s)-1])
+		if newVal == "" {
+			return defaultVal
 		}
-	}
+		key = strings.ReplaceAll(key, envMatch[i], newVal)
+ 	}
 
-	realValue = os.Getenv(key)
-	if realValue == "" {
-		realValue = defaultV
-	}
-
-	return
+	return key
 }
